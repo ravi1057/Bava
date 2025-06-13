@@ -1,39 +1,115 @@
 using Microsoft.AspNetCore.Mvc;
-using Ecommerce.Api.Models; // Ensure this using statement is present
+using Ecommerce.Api.Models;
+using Ecommerce.Api.Data; // Added
+using Microsoft.EntityFrameworkCore; // Added
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks; // Added
 
-namespace Ecommerce.Api.Controllers // Ensure this namespace matches your folder structure
+namespace Ecommerce.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
     public class ProductsController : ControllerBase
     {
-        private static readonly List<Product> _products = new List<Product>
-        {
-            new Product { Id = 1, Name = "Classic T-Shirt", Price = 19.99m, Description = "A comfortable and stylish classic t-shirt.", ImageUrl = "https://via.placeholder.com/300x300.png?text=Classic+T-Shirt" },
-            new Product { Id = 2, Name = "Running Shoes", Price = 79.99m, Description = "Lightweight running shoes for optimal performance.", ImageUrl = "https://via.placeholder.com/300x300.png?text=Running+Shoes" },
-            new Product { Id = 3, Name = "Bluetooth Headphones", Price = 49.99m, Description = "Wireless Bluetooth headphones with noise cancellation.", ImageUrl = "https://via.placeholder.com/300x300.png?text=Bluetooth+Headphones" },
-            new Product { Id = 4, Name = "Coffee Maker", Price = 29.99m, Description = "Drip coffee maker with a 12-cup capacity.", ImageUrl = "https://via.placeholder.com/300x300.png?text=Coffee+Maker" },
-            new Product { Id = 5, Name = "Yoga Mat", Price = 24.99m, Description = "Eco-friendly yoga mat for your daily practice.", ImageUrl = "https://via.placeholder.com/300x300.png?text=Yoga+Mat" }
-        };
+        private readonly AppDbContext _context; // Added
 
-        [HttpGet]
-        public ActionResult<IEnumerable<Product>> GetProducts()
+        // Added constructor
+        public ProductsController(AppDbContext context)
         {
-            return Ok(_products);
+            _context = context;
         }
 
-        // Optional: Add a GET by ID endpoint for future use
-        [HttpGet("{id}")]
-        public ActionResult<Product> GetProduct(int id)
+        // GET: api/products
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
         {
-            var product = _products.FirstOrDefault(p => p.Id == id);
+            return await _context.Products.ToListAsync();
+        }
+
+        // GET: api/products/5
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Product>> GetProduct(int id)
+        {
+            var product = await _context.Products.FindAsync(id);
+
             if (product == null)
             {
                 return NotFound();
             }
-            return Ok(product);
+
+            return product;
+        }
+
+        // POST: api/products
+        [HttpPost]
+        public async Task<ActionResult<Product>> PostProduct(Product product)
+        {
+            // Basic validation, more can be added
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+            _context.Products.Add(product);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, product);
+        }
+
+        // PUT: api/products/5
+        [HttpPut("{id}")]
+        public async Task<IActionResult> PutProduct(int id, Product product)
+        {
+            if (id != product.Id)
+            {
+                return BadRequest("Product ID mismatch.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            _context.Entry(product).State = EntityState.Modified;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!ProductExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return NoContent();
+        }
+
+        // DELETE: api/products/5
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteProduct(int id)
+        {
+            var product = await _context.Products.FindAsync(id);
+            if (product == null)
+            {
+                return NotFound();
+            }
+
+            _context.Products.Remove(product);
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        private bool ProductExists(int id)
+        {
+            return _context.Products.Any(e => e.Id == id);
         }
     }
 }
